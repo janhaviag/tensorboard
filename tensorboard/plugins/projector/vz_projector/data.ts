@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+
 namespace vz_projector {
 
 export type DistanceFunction = (a: vector.Vector, b: vector.Vector) => number;
@@ -86,7 +87,7 @@ const NUM_PCA_COMPONENTS = 10;
 
 /** Id of message box used for umap optimization progress bar. */
 const UMAP_MSG_ID = 'umap-optimization';
-
+const NUM_CLUSTERS = 50;
 /**
  * Reserved metadata attributes used for sequence information
  * NOTE: Use "__seq_next__" as "__next__" is deprecated.
@@ -107,6 +108,12 @@ function getSequenceNextPointIndex(pointMetadata: PointMetadata): number|null {
   return +sequenceAttr;
 }
 
+
+export class Cluster{
+  centroid: DataPoint;
+  members: DataPoint[];
+}
+
 /**
  * Dataset contains a DataPoints array that should be treated as immutable. This
  * acts as a working subset of the original data, with cached properties
@@ -117,8 +124,8 @@ function getSequenceNextPointIndex(pointMetadata: PointMetadata): number|null {
 export class DataSet {
   points: DataPoint[];
   sequences: Sequence[];
-
   shuffledDataIndices: number[] = [];
+  clusters: Cluster[];
 
   /**
    * This keeps a list of all current projections so you can easily test to see
@@ -146,6 +153,8 @@ export class DataSet {
   constructor(
       points: DataPoint[], spriteAndMetadataInfo?: SpriteAndMetadataInfo) {
     this.points = points;
+    var centroids = points.slice(0, NUM_CLUSTERS);
+    this.clusters = this.computeClusters(points, centroids, NUM_CLUSTERS)
     this.shuffledDataIndices = util.shuffle(util.range(this.points.length));
     this.sequences = this.computeSequences(points);
     this.dim = [this.points.length, this.points[0].vector.length];
@@ -256,19 +265,32 @@ export class DataSet {
     });
   }
 
+  
+
   /** Projects the dataset along the top 10 principal components. */
   projectPCA(): Promise<void> {
     if (this.projections['pca-0'] != null) {
       return Promise.resolve<void>(null);
     }
     return util.runAsyncTask('Computing PCA...', () => {
+      logging.setModalMessage(null, 'HELLO')
+      logging.setModalMessage(null, 'HELLO')
+      logging.setModalMessage(null, 'HELLO')
+      logging.setModalMessage(null, 'HELLO')
+      logging.setModalMessage(null, 'HELLO')
+      
+
       // Approximate pca vectors by sampling the dimensions.
-      let dim = this.points[0].vector.length;
-      let vectors = this.shuffledDataIndices.map(i => this.points[i].vector);
-      if (dim > PCA_SAMPLE_DIM) {
+      let dim = this.kcentroids[0].vector;
+      //this.points = this.points.slice(0,5)
+
+      //logging.setModalMessage(null, this.points)
+      let vectors = this.shuffledDataIndices.map(i => this.kcentroids[i].vector);
+      if (dim < PCA_SAMPLE_DIM) {
         vectors = vector.projectRandom(vectors, PCA_SAMPLE_DIM);
       }
-      const sampledVectors = vectors.slice(0, PCA_SAMPLE_SIZE);
+
+      const sampledVectors = vectors.slice(0, 3);
       const {dot, transpose, svd: numericSvd} = numeric;
       // numeric dynamically generates `numeric.div` and Closure compiler has
       // incorrectly compiles `numeric.div` property accessor. We use below
@@ -305,7 +327,7 @@ export class DataSet {
         this.projections[label] = true;
         for (let i = 0; i < pcaVectors.length; i++) {
           let pointIndex = this.shuffledDataIndices[i];
-          this.points[pointIndex].projections[label] = pcaVectors[i][d];
+          this.kcentroids[pointIndex].projections[label] = pcaVectors[i][d];
         }
       }
     });
@@ -552,6 +574,13 @@ export class DataSet {
 
   stopTSNE() {
     this.tSNEShouldStop = true;
+  }
+
+  computeClusters(points: DataPoint[], clusters: Cluster[]): Cluster[]{
+    points.forEach(element => {
+      
+    });
+
   }
 
   /**
